@@ -7,6 +7,7 @@ class Agent:
     def __init__(self, x, y, character, environment):
         self.x = x
         self.y = y
+        self.action_vector = [self.move_up, self.move_down, self.move_left, self.move_right]
 
         #Agent needs to be able to look at the environment to determine
         #what moves are possible
@@ -15,31 +16,35 @@ class Agent:
         assert len(character) == 1,"Character must be a single printable character"
         self.character = character
 
-    def getX(self):
+    def getx(self):
         return self.x
 
-    def getY(self):
+    def gety(self):
         return self.y
 
-    def move(self,direction):
-        actionVector = [self.moveUp, self.moveDown, self.moveLeft, self.moveRight]
-        assert direction >= 0 and direction <= 3,"Invalid direction provided. Must be integer in 0..3"
-        actionVector[direction]()
+    #This returns a list of valid directions that can be passed to the move() method.
+    #Note that running into a wall is considered a valid move, this makes no assumptions of intent.
+    def get_possible_movement_directions(self):
+        return [x for x in range(0, len(self.action_vector))]
 
-    def moveUp(self):
-        if self.getY() > 0:
+    def move(self,direction):
+        assert direction >= 0 and direction <= len(self.action_vector),"Invalid direction provided. Must be integer in 0..3"
+        self.action_vector[direction]()
+
+    def move_up(self):
+        if self.gety() > 0:
             self.y = self.y - 1
 
-    def moveDown(self):
-        if self.getY() < self.environment.height - 1:
+    def move_down(self):
+        if self.gety() < self.environment.height - 1:
             self.y = self.y + 1
 
-    def moveLeft(self):
-        if self.getX() > 0:
+    def move_left(self):
+        if self.getx() > 0:
             self.x = self.x - 1
 
-    def moveRight(self):
-        if self.getX() < self.environment.width - 1:
+    def move_right(self):
+        if self.getx() < self.environment.width - 1:
             self.x = self.x + 1
 
 class Environment:
@@ -49,12 +54,12 @@ class Environment:
         self.world = [0 for x in range(0, self.width*self.height)]
         self.agent = Agent(self.width // 2,self.height // 2, 'A', self)
         self.food = Agent(0, 0, 'R', self)
-        self.agentsList = [self.agent, self.food]
+        self.agents_list = [self.agent, self.food]
 
     def render(self):
         #Render the top border of the world
-        topBorderString = "".join(["-" for x in range(0, self.width+2)])
-        print(topBorderString)
+        top_border_string = "".join(["-" for x in range(0, self.width+2)])
+        print(top_border_string)
 
         #print the stuff inside the environment
         for y in range(0, self.height):
@@ -62,59 +67,77 @@ class Environment:
                 if x == 0 or x == self.width:
                     print("|", end="")
 
-                charToPrint = ' '
-                for a in self.agentsList:
-                    if x == a.getX() and y == a.getY():
-                        charToPrint = a.character
+                char_to_print = ' '
+                for a in self.agents_list:
+                    if x == a.getx() and y == a.gety():
+                        char_to_print = a.character
 
                 #we print just one character so overlapping agents don't
                 #mess up the display
-                print(charToPrint, end="")
+                print(char_to_print, end="")
 
             print("", end="\n")
 
 
         #Bottom border string is the same as the top, so we can just
         #draw that again
-        print(topBorderString)
+        print(top_border_string)
 
-    def resetAgent(self):
+    def reset_agent(self):
         pass
+
+    #Move the food to a random spot, make sure it's not on top of the agent
+    def reset_food(self):
+        newx = self.agent.getx()
+        newy = self.agent.gety()
+        while newx == self.agent.getx() and newy == self.agent.gety():
+            newx = random.randint(0, self.width-1)
+            newy = random.randint(0, self.height-1)
+
+        self.food.x = newx
+        self.food.y = newy
+
+    #returns True if agent is on top of food, otherwise false
+    def has_agent_food_collision(self):
+        if self.agent.getx() == self.food.getx() and self.agent.gety() == self.food.gety():
+            return True
+
+        return False
 
     #Returns a feature vector for a particular state that the
     #non-food agent is in. This is what our MDP will learn to
     #interpret.
     #It is assuming an environment with only one "food" item.  
-    def getStateVector(self, as_string=False):
-        sv = [0 for k in range(0, 8)]
+    def get_state_vector(self, as_string=False):
+        sv = [0 for k in range(8)]
 
-        aX = self.agent.getX()
-        aY = self.agent.getY()
+        ax = self.agent.getx()
+        ay = self.agent.gety()
 
         #upper left
-        if self.food.getX() < aX and self.food.getY() < aY:
+        if self.food.getx() < ax and self.food.gety() < ay:
             sv[0] = 1
         #above
-        if self.food.getX() == aX and self.food.getY() < aY:
+        if self.food.getx() == ax and self.food.gety() < ay:
             sv[1] = 1
         #upper right
-        if self.food.getX() > aX and self.food.getY() < aY:
+        if self.food.getx() > ax and self.food.gety() < ay:
             sv[2] = 1
         #right
-        if self.food.getX() > aX and self.food.getY() == aY:
+        if self.food.getx() > ax and self.food.gety() == ay:
             sv[3] = 1
         #lower right
-        if self.food.getX() > aX and self.food.getY() > aY:
+        if self.food.getx() > ax and self.food.gety() > ay:
             sv[4] = 1
         #below
-        if self.food.getX() == aX and self.food.getY() > aY:
+        if self.food.getx() == ax and self.food.gety() > ay:
             sv[5] = 1
         #lower left
-        if self.food.getX() < aX and self.food.getY() > aY:
+        if self.food.getx() < ax and self.food.gety() > ay:
             sv[6] = 1
         #left
-        if self.food.getX() < aX and self.food.getY() == aY:
-            sv[7] == 1
+        if self.food.getx() < ax and self.food.gety() == ay:
+            sv[7] = 1
 
         if as_string == False:
             return sv
@@ -127,7 +150,7 @@ def tests():
     #e.render()
 
     #first food location is upper left
-    assert e.getStateVector(as_string=True) == "10000000","State vector not as it should be!"
+    assert e.get_state_vector(as_string=True) == "10000000","State vector not as it should be!"
 
     #run a loop for a while that moves the agent around the environment,
     #just to observe the behavior

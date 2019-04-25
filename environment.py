@@ -27,7 +27,7 @@ class Agent:
     def get_possible_movement_directions(self):
         return [x for x in range(0, len(self.action_vector))]
 
-    def move(self,direction):
+    def move(self, direction):
         assert direction >= 0 and direction <= len(self.action_vector),"Invalid direction provided. Must be integer in 0..3"
         self.action_vector[direction]()
 
